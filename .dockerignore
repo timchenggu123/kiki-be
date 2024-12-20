@@ -1,0 +1,6 @@
+__pycache__
+./lib/__pycache__
+storage/*
+auth.db
+.git
+tmp
