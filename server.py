@@ -47,7 +47,6 @@ def register():
         return jsonify({"message": "Invalid user name"}), 400
 
     hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
-    print(hashed_password)
     auth_db.add_user(username, hashed_password)
     return jsonify({"message": "User registered successfully"}), 201
 
@@ -57,14 +56,12 @@ def login():
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
-    print(auth_db.get_password(username))
-    
 
     if not auth_db.user_exists(username) or not bcrypt.check_password_hash(auth_db.get_password(username), password):
         return jsonify({"message": "Invalid credentials"}), 401
 
     access_token = create_access_token(identity=username)
-    print(access_token)
+    
     response = jsonify({"message": "Login successful"})
     set_access_cookies(response, access_token)  # Set the JWT in a cookie
     return response, 200
@@ -229,11 +226,10 @@ def answer_card():
             return jsonify({"error": "Invalid ease rating. Must be 1 (Again), 2 (Hard), 3 (Good), or 4 (Easy)."}), 400
         
         rating = CardAnswer.AGAIN if rating == 1 else CardAnswer.HARD if rating == 2 else CardAnswer.GOOD if rating == 3 else CardAnswer.EASY
-        col.decks.select(col.get_card(card_id).did)  # Select the deck of the card
 
         # Get the card
         card = col.get_card(card_id)
-        card.timer_started = time_started
+        card.timer_started = time.time()
         if not card:
             return jsonify({"message": f"Card with ID {card_id} not found."}), 404
         
@@ -241,7 +237,6 @@ def answer_card():
         changes = col.sched.answer_card(
             col.sched.build_answer(card=card, states=states, rating=rating)
         )
-        print(changes)
         return jsonify({"message": "Card answered successfully.", "Card ID": card_id, "Ease": rating})
         
     except Exception as e:

@@ -9,7 +9,6 @@ def replacePlayTag(txt, front_av_files:list, back_av_tags:list):
             files = front_av_files
         else:
             files = back_av_tags
-        print(files, side, match.group(3))
         file = files[int(match.group(3))]
         return f'''
 <audio src="{file}" controls></audio>
