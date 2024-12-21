@@ -14,12 +14,12 @@ RUN pip install -r requirements.txt
 RUN apt-get update && apt-get install -y nginx certbot python3-certbot-nginx
 
 # Install ssl certificate
-RUN certbot --nginx --non-interactive --agree-tos --email 2013tim.g@gmail.com -d kikiserver.timgu.me
 
 # Copy the nginx configuration file
 COPY nginx.conf /etc/nginx/sites-available/default
 
-EXPOSE 8080
+EXPOSE 80
+EXPOSE 443
 
 # Run flash server when the container launches
 ENTRYPOINT [ "./entrypoint.sh" ]
