@@ -15,14 +15,14 @@ from lib.media import *
 from pathlib import Path
 
 app = Flask(__name__)
-app.config['JWT_SECRET_KEY'] = 'your-secret-key'  # Replace with a secure key
+app.config['JWT_SECRET_KEY'] = 'kl;sdajfaugygdfa'  # Replace with a secure key
 app.config['JWT_TOKEN_LOCATION'] = ['cookies']  # Store JWT in cookies
-app.config['JWT_COOKIE_SECURE'] = False         # Set to True in production with HTTPS
-app.config['JWT_COOKIE_HTTPONLY'] = True        # Prevent JavaScript from accessing the cookie
+app.config['JWT_COOKIE_SECURE'] = True         # Set to True in production with HTTPS
 app.config['JWT_ACCESS_COOKIE_NAME'] = 'access_token_cookie'
 # disable csrf protection
 app.config['JWT_COOKIE_CSRF_PROTECT'] = False
 # Set token expiration time 1 day
+
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 86400
 app.config['MAX_CONTENT_LENGTH'] = 1024**3
 app.config['JWT_COOKIE_SAMESITE'] = 'None'
