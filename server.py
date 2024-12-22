@@ -12,6 +12,7 @@ from anki.collection import *
 from anki.scheduler.v3 import * 
 import auth_db
 from lib.media import *
+from pathlib import Path
 
 app = Flask(__name__)
 app.config['JWT_SECRET_KEY'] = 'your-secret-key'  # Replace with a secure key
@@ -357,8 +358,9 @@ def upload_file():
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
 
-    # Save the file
-    filepath = os.path.join('tmp', file.filename)
+    tmp_dir = f"./tmp/{user}"
+    Path(tmp_dir).mkdir(parents=True, exist_ok=True)
+    filepath = os.path.join(tmp_dir, file.filename)
     file.save(filepath)
 
     #import the deck
