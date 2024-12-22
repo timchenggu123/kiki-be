@@ -13,13 +13,10 @@ RUN pip install -r requirements.txt
 #Install nginx
 RUN apt-get update && apt-get install -y nginx certbot python3-certbot-nginx
 
-# Install ssl certificate
-
 # Copy the nginx configuration file
 COPY nginx.conf /etc/nginx/sites-available/default
 
+RUN chmod +x ./run_certbot.sh && chmod +x ./entrypoint.sh
+
 EXPOSE 80
 EXPOSE 443
-
-# Run flash server when the container launches
-ENTRYPOINT [ "./entrypoint.sh" ]

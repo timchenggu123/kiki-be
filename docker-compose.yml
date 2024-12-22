@@ -1,0 +1,9 @@
+services:
+  kiki-server:
+    build: .
+    ports: 
+        - "80:80"
+        - "443:443"
+    volumes: 
+        - "./:/app"
+    command: /bin/bash -c "service nginx start && ./run_certbot.sh && gunicorn -c gunicorn_config.py server:app"
