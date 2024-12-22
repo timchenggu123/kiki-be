@@ -24,7 +24,7 @@ app.config['JWT_COOKIE_CSRF_PROTECT'] = False
 # Set token expiration time 1 day
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 86400
 # app.config['JWT_COOKIE_SAMESITE'] = 'None'
-
+app.config['MAX_CONTENT_LENGHT'] = 1024**3
 bcrypt = Bcrypt(app)
 jwt = JWTManager(app)
 CORS(app, supports_credentials=True)
