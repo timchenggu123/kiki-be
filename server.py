@@ -30,8 +30,7 @@ jwt = JWTManager(app)
 CORS(app, supports_credentials=True)
 
 # Path to your Anki collection file
-COLLECTION_PATH = "./storage/foo.anki2"
-col = Collection(COLLECTION_PATH)
+COLLECTION_ROOT = "./storage/"
 
 @jwt.unauthorized_loader
 def unauthorized_callback(callback):
@@ -46,8 +45,8 @@ def register():
     username = data.get('username')
     password = data.get('password')
 
-    if username != "zoey":
-        return jsonify({"message": "Invalid user name"}), 400
+    # if username != "zoey":
+    #     return jsonify({"message": "Invalid user name"}), 400
 
     hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
     auth_db.add_user(username, hashed_password)
@@ -84,6 +83,9 @@ def home():
 @jwt_required()
 def get_decks():
     """List all decks."""
+    user= get_jwt_identity()
+    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+    col = Collection(collection_path)
     decks = col.decks.all_names_and_ids()
     decks_list = [{"id": deck.id, "name": deck.name} for deck in decks]
     return jsonify(decks_list)
@@ -92,6 +94,9 @@ def get_decks():
 @jwt_required()
 def get_cards(deck_id):
     """Get all cards from a deck."""
+    user = get_jwt_identity()
+    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+    col = Collection(collection_path)
     card_ids = col.find_notes(f"did:{deck_id}")
     cards = [col.get_note(card_id) for card_id in card_ids]
     cards = [{"id":card.id, "Front": card.fields[0], "Back": card.fields[1]} for card in cards]
@@ -102,6 +107,9 @@ def get_cards(deck_id):
 def add_card_raw(deck_id):
     """Add a new card to a deck."""
     try:
+        user = get_jwt_identity()
+        collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+        col = Collection(collection_path)
         data = request.json
         front = data.get("front")
         back = data.get("back")
@@ -124,6 +132,9 @@ def add_card_from(deck_id, card_id):
     """Add a new card to a deck."""
     try:
         # First, duplicate the note
+        user = get_jwt_identity()
+        collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+        col = Collection(collection_path)
         note = col.get_card(int(card_id)).note()
         new_note = col.new_note(note.note_type())
         new_note.fields = note.fields
@@ -139,6 +150,9 @@ def add_card_from(deck_id, card_id):
 @jwt_required()
 def remove_card(cid):
     """Add a new card to a deck."""
+    user = get_jwt_identity()
+    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+    col = Collection(collection_path)
     card_id = int(cid)
     note_id = col.get_card(card_id).nid
     col.remove_notes([note_id])
@@ -152,6 +166,9 @@ def get_next_card(deck_id):
     """
     try:
         # Set the deck for the session
+        user = get_jwt_identity()
+        collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+        col = Collection(collection_path)
         deck_id = int(deck_id)
         col.decks.select(deck_id)  # Select the specified deck
 
@@ -220,6 +237,9 @@ def answer_card():
     Submit an answer for a card using the scheduler.
     """
     try:
+        user = get_jwt_identity()
+        collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+        col = Collection(collection_path)
         data = request.json
         rating = data.get("rating")  # User's ease rating: 1 = Again, 2 = Hard, 3 = Good, 4 = Easy
         card_id = int(data.get("cid"))  # ID of the card being answered
@@ -261,6 +281,9 @@ def answer_card():
 @jwt_required()
 def add_deck():
     """Add a new deck."""
+    user = get_jwt_identity()
+    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+    col = Collection(collection_path)
     data = request.json
     name = data.get("name")
     col.decks.add_normal_deck_with_name(name)
@@ -270,6 +293,9 @@ def add_deck():
 @jwt_required()
 def remove_deck(deck_id):
     """Remove a deck."""
+    user = get_jwt_identity()
+    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+    col = Collection(collection_path)
     did = int(deck_id)
     col.decks.remove([did])
     return jsonify({"message": "Deck removed successfully!"})
@@ -278,6 +304,9 @@ def remove_deck(deck_id):
 @jwt_required()
 def get_deck_config(deck_id):
     """Get the configuration of a deck."""
+    user = get_jwt_identity()
+    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+    col = Collection(collection_path)
     did = int(deck_id)
     config = col.decks.config_dict_for_deck_id(did)
     return jsonify(config)
@@ -286,6 +315,9 @@ def get_deck_config(deck_id):
 @jwt_required()
 def set_deck_config(deck_id):
     """Set the configuration of a deck."""
+    user = get_jwt_identity()
+    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+    col = Collection(collection_path)
     data = request.json
     col.decks.update_config(data)
     return jsonify({"message": "Deck configuration updated successfully!"})
@@ -293,6 +325,9 @@ def set_deck_config(deck_id):
 @app.route("/card/<string:cid>/<string:side>/audio", methods=["get"])
 @jwt_required()
 def streamaudio(cid, side):
+    user = get_jwt_identity()
+    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+    col = Collection(collection_path)
     if side == "front":
         tags = col.get_card(int(cid)).question_av_tags()
     else:
@@ -309,7 +344,11 @@ def streamaudio(cid, side):
         as_attachment=False)
 
 @app.route('/upload/deck', methods=['POST'])
+@jwt_required()
 def upload_file():
+    user = get_jwt_identity()
+    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+    col = Collection(collection_path)
     if 'file' not in request.files:
         return jsonify({'error': 'No file part in the request'}), 400
     
@@ -330,8 +369,10 @@ def upload_file():
     return jsonify({'message': 'File uploaded successfully', 'filename': file.filename}), 200
 
 @app.route("/media/<string:filename>", methods=["GET"])
+@jwt_required()
 def get_media(filename):
-    base_dir = col.media.dir()
+    user = get_jwt_identity()
+    base_dir = os.path.join(COLLECTION_ROOT, f"{user}.media")
     file_path = os.path.join(base_dir, filename)
     return send_file(file_path)
 
