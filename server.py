@@ -1,7 +1,7 @@
 import os, sys
 os.chdir(os.path.dirname(__file__))
 sys.path.append(os.path.dirname(__file__))
-from flask import Flask, jsonify, request, send_file
+from flask import Flask, jsonify, request, send_file, redirect
 from flask_cors import CORS
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import (
@@ -25,10 +25,6 @@ app.config['JWT_COOKIE_CSRF_PROTECT'] = False
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 86400
 # app.config['JWT_COOKIE_SAMESITE'] = 'None'
 
-# Redirect to login when not authorized
-app.config['JWT_UNAUTHORIZED_VIEW'] = '/auth/login'
-
-
 bcrypt = Bcrypt(app)
 jwt = JWTManager(app)
 CORS(app, supports_credentials=True)
@@ -36,6 +32,13 @@ CORS(app, supports_credentials=True)
 # Path to your Anki collection file
 COLLECTION_PATH = "./storage/foo.anki2"
 col = Collection(COLLECTION_PATH)
+
+@jwt.unauthorized_loader
+def unauthorized_callback(callback):
+    return jsonify({
+        "message": "Unauthorized, please log in.",
+        "redirect": "/auth/login"
+    }), 401
 
 @app.route('/register', methods=['POST'])
 def register():
@@ -305,18 +308,24 @@ def streamaudio(cid, side):
         mimetype="audio/wav", 
         as_attachment=False)
 
-@app.route('/upload', methods=['POST'])
+@app.route('/upload/deck', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
         return jsonify({'error': 'No file part in the request'}), 400
-
+    
     file = request.files['file']
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
 
     # Save the file
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+    filepath = os.path.join('tmp', file.filename)
     file.save(filepath)
+
+    #import the deck
+    import_request = ImportAnkiPackageRequest(package_path=filepath)
+    col.import_anki_package(import_request)
+    # Remove the file
+    os.remove(filepath)
 
     return jsonify({'message': 'File uploaded successfully', 'filename': file.filename}), 200
 
