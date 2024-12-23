@@ -2,8 +2,9 @@ services:
   kiki-server:
     build: .
     ports: 
-        - "80:80"
-        - "443:443"
+      - "80:80"
+      - "443:443"
     volumes: 
-        - "./:/app"
+      - "./:/app"
+      - "/etc/timezone:/etc/timezone:ro"
     command: /bin/bash -c "service nginx start && ./run_certbot.sh && gunicorn -c gunicorn_config.py server:app"
