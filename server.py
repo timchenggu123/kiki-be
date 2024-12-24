@@ -60,18 +60,21 @@ def register():
 # Login route
 @app.route('/login', methods=['POST'])
 def login():
-    data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        password = data.get('password')
 
-    if not auth_db.user_exists(username) or not bcrypt.check_password_hash(auth_db.get_password(username), password):
-        return jsonify({"message": "Invalid credentials"}), 401
+        if not auth_db.user_exists(username) or not bcrypt.check_password_hash(auth_db.get_password(username), password):
+            return jsonify({"message": "Invalid credentials"}), 401
 
-    access_token = create_access_token(identity=username)
-    
-    response = jsonify({"message": "Login successful"})
-    set_access_cookies(response, access_token)  # Set the JWT in a cookie
-    return response, 200
+        access_token = create_access_token(identity=username)
+        
+        response = jsonify({"message": "Login successful"})
+        set_access_cookies(response, access_token)  # Set the JWT in a cookie
+        return response, 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # Logout route (clear cookie)
 @app.route('/auth/logout', methods=['GET'])
@@ -95,17 +98,42 @@ def get_decks():
     decks_list = [{"id": deck.id, "name": deck.name} for deck in decks]
     return jsonify(decks_list)
 
-@app.route("/deck/<string:deck_id>/cards", methods=["GET"])
+@app.route("/deck/<string:deck_id>/notes", methods=["GET"])
 @jwt_required()
-def get_cards(deck_id):
+def get_notes(deck_id):
     """Get all cards from a deck."""
     user = get_jwt_identity()
     collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
     col = Collection(collection_path)
-    card_ids = col.find_notes(f"did:{deck_id}")
-    cards = [col.get_note(card_id) for card_id in card_ids]
-    cards = [{"id":card.id, "Front": card.fields[0], "Back": card.fields[1]} for card in cards]
-    return jsonify(cards)
+    note_ids = col.find_notes(f"did:{deck_id}")
+    notes = [{"id":id, "title": col.get_note(id).fields[0], "ncards": len(col.get_note(id).cards())} for id in note_ids]
+    return jsonify(notes)
+
+@app.route("/cards/<string:card_id>", methods=["GET"])
+@jwt_required()
+def get_card(card_id):
+    """Get a card by ID."""
+    user = get_jwt_identity()
+    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+    col = Collection(collection_path)
+    card = col.get_card(int(card_id)).note()
+    fields = card.fields
+    keys = card.keys()
+    ret = [[key, field] for key, field in zip(keys, fields)]
+    return jsonify(ret)
+
+@app.route("/notes/<string:note_id>", methods=["GET"])
+@jwt_required()
+def get_note(note_id):
+    """Get a card by ID."""
+    user = get_jwt_identity()
+    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+    col = Collection(collection_path)
+    note = col.get_note(int(note_id))
+    fields = note.fields
+    keys = note.keys()
+    ret = [[key, field] for key, field in zip(keys, fields)]
+    return jsonify(ret)
 
 @app.route("/deck/<string:deck_id>/add/raw", methods=["POST"])
 @jwt_required()
@@ -151,17 +179,33 @@ def add_card_from(deck_id, card_id):
         return jsonify({"error": str(e)}), 500
     
 
-@app.route("/card/remove/<string:cid>", methods=["GET"])
+@app.route("/card/remove/<string:cid>", methods=["POST"])
 @jwt_required()
 def remove_card(cid):
     """Add a new card to a deck."""
     user = get_jwt_identity()
     collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
     col = Collection(collection_path)
+    data = request.json
+    cid = int(data.get("cid"))
     card_id = int(cid)
     note_id = col.get_card(card_id).nid
     col.remove_notes([note_id])
     return jsonify({"message": "Card removed successfully!"})
+
+@app.route("/note/batchremove", methods=["POST"])
+@jwt_required()
+def batch_remove_note():
+    """Remove multiple cards."""
+    user = get_jwt_identity()
+    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+    col = Collection(collection_path)
+    data = request.json
+    note_ids = data.get("nids")
+    if len(note_ids) == 0:
+        return jsonify({"error": "No note IDs provided."}), 400
+    col.remove_notes(note_ids)
+    return jsonify({"message": "Notes removed successfully!"})
 
 @app.route("/study/<string:deck_id>/next", methods=["GET"])
 @jwt_required()
@@ -332,27 +376,6 @@ def set_deck_config(deck_id):
     data = request.json
     col.decks.update_config(data)
     return jsonify({"message": "Deck configuration updated successfully!"})
-
-@app.route("/card/<string:cid>/<string:side>/audio", methods=["get"])
-@jwt_required()
-def streamaudio(cid, side):
-    user = get_jwt_identity()
-    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-    col = Collection(collection_path)
-    if side == "front":
-        tags = col.get_card(int(cid)).question_av_tags()
-    else:
-        tags = col.get_card(int(cid)).answer_av_tags()
-    if not tags or isTTSTag(tags[0]):
-        return jsonify({"error": "No audio file found for the card."}), 404
-    file_path = tags[0].filename
-    base_dir = col.media.dir()
-    file_path = os.path.join(base_dir, file_path)
-
-    return send_file(
-        file_path, 
-        mimetype="audio/wav", 
-        as_attachment=False)
 
 @app.route('/upload/deck', methods=['POST'])
 @jwt_required()
