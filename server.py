@@ -375,6 +375,7 @@ def set_deck_config(deck_id):
     col = Collection(collection_path)
     data = request.json
     col.decks.update_config(data)
+    col.sched.resort_conf(data)
     return jsonify({"message": "Deck configuration updated successfully!"})
 
 @app.route('/upload/deck', methods=['POST'])
