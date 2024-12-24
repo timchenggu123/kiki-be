@@ -43,16 +43,19 @@ def unauthorized_callback(callback):
 
 @app.route('/register', methods=['POST'])
 def register():
-    data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        password = data.get('password')
 
-    # if username != "zoey":
-    #     return jsonify({"message": "Invalid user name"}), 400
+        # if username != "zoey":
+        #     return jsonify({"message": "Invalid user name"}), 400
 
-    hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
-    auth_db.add_user(username, hashed_password)
-    return jsonify({"message": "User registered successfully"}), 201
+        hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
+        auth_db.add_user(username, hashed_password)
+        return jsonify({"message": "User registered successfully"}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # Login route
 @app.route('/login', methods=['POST'])
@@ -208,6 +211,13 @@ def get_next_card(deck_id):
         front = replacePlayTag(front, front_files, back_files)
         back = replacePlayTag(back, front_files, back_files)
 
+        intervals = {
+            "again": col.sched.nextIvlStr(card, 1),
+            "hard": col.sched.nextIvlStr(card, 2),
+            "okay": col.sched.nextIvlStr(card, 3),
+            "easy": col.sched.nextIvlStr(card, 4)
+        }
+
         card = {
             "cid": card.id,
             "Front": front,  # Front field
@@ -220,15 +230,14 @@ def get_next_card(deck_id):
             "learning": learning,
             "review": review
         }
-
         # Return the card's details
         return jsonify({
             "card": card,
-            "counts": counts
+            "counts": counts,
+            "intervals": intervals
         })
 
     except Exception as e:
-        print(e)
         return jsonify({"error": str(e)}), 500
 
 
