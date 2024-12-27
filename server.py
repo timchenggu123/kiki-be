@@ -12,6 +12,7 @@ from anki.collection import *
 from anki.scheduler.v3 import * 
 import auth_db
 from lib.media import *
+from lib.dictCard import *
 from pathlib import Path
 
 app = Flask(__name__)
@@ -158,6 +159,40 @@ def add_card_raw(deck_id):
         return jsonify({"message": "Card added successfully!"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+
+@app.route("/deck/<string:deck_id>/add/dict", methods=["POST"])
+@jwt_required()
+def add_card_dict(deck_id):
+    """Add a new card to a deck."""
+    # try:
+    user = get_jwt_identity()
+    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+    col = Collection(collection_path)
+    data = request.json
+    word = data.get("word")
+    phonetic = data.get("phonetic")
+    meanings = data.get("meanings_text")
+    origin = data.get("origin")
+    audio = data.get("audio")
+
+    # Get dict card model
+    if col.models.by_name("KikiDictCard"):
+        col.models.remove(col.models.by_name("KikiDictCard")["id"])
+    createDictCardModel(col)
+    model = col.models.by_name("KikiDictCard")
+    note = col.new_note(model)
+    print(note.fields)
+    note.fields[0] = word
+    note.fields[1] = phonetic
+    note.fields[2] = audio
+    note.fields[3] = meanings
+    note.fields[4] = origin
+
+    col.add_note(note, int(deck_id))
+    return jsonify({"message": "Card added successfully!"})
+    # except Exception as e:
+    #     return jsonify({"error": str(e)}), 500
 
 @app.route("/deck/<string:deck_id>/add/from/<string:card_id>", methods=["GET"])
 @jwt_required()
