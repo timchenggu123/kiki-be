@@ -23,7 +23,7 @@ app.config['JWT_ACCESS_COOKIE_NAME'] = 'access_token_cookie'
 # disable csrf protection
 app.config['JWT_COOKIE_CSRF_PROTECT'] = False
 # Set token expiration time 1 day
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 86400
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 7*86400
 app.config['MAX_CONTENT_LENGTH'] = 1024**3
 app.config['JWT_COOKIE_SAMESITE'] = 'None'
 
