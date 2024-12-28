@@ -110,6 +110,20 @@ def get_notes(deck_id):
     notes = [{"id":id, "title": col.get_note(id).fields[0], "ncards": len(col.get_note(id).cards())} for id in note_ids]
     return jsonify(notes)
 
+@app.route("/note/batchremove", methods=["POST"])
+@jwt_required()
+def batch_remove_note():
+    """Remove multiple ntoes."""
+    user = get_jwt_identity()
+    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+    col = Collection(collection_path)
+    data = request.json
+    note_ids = data.get("nids")
+    if len(note_ids) == 0:
+        return jsonify({"error": "No note IDs provided."}), 400
+    col.remove_notes(note_ids)
+    return jsonify({"message": "Notes removed successfully!"})
+
 @app.route("/cards/<string:card_id>", methods=["GET"])
 @jwt_required()
 def get_card(card_id):
@@ -135,6 +149,25 @@ def get_note(note_id):
     keys = note.keys()
     ret = [[key, field] for key, field in zip(keys, fields)]
     return jsonify(ret)
+
+#Edit a note
+@app.route("/note/update/<string:note_id>", methods=["POST"])
+@jwt_required()
+def update_note(note_id):
+    """Edit a note."""
+    try: 
+        user = get_jwt_identity()
+        collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+        col = Collection(collection_path)
+        fields = request.json
+        note = col.get_note(int(note_id))
+        assert len(fields) == len(note.fields)
+        for i, field in enumerate(fields):
+            note.fields[i] = field
+        col.update_note(note)
+        return jsonify({"message": "Note updated successfully!"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/deck/<string:deck_id>/add/raw", methods=["POST"])
 @jwt_required()
@@ -227,20 +260,6 @@ def remove_card(cid):
     note_id = col.get_card(card_id).nid
     col.remove_notes([note_id])
     return jsonify({"message": "Card removed successfully!"})
-
-@app.route("/note/batchremove", methods=["POST"])
-@jwt_required()
-def batch_remove_note():
-    """Remove multiple cards."""
-    user = get_jwt_identity()
-    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-    col = Collection(collection_path)
-    data = request.json
-    note_ids = data.get("nids")
-    if len(note_ids) == 0:
-        return jsonify({"error": "No note IDs provided."}), 400
-    col.remove_notes(note_ids)
-    return jsonify({"message": "Notes removed successfully!"})
 
 @app.route("/study/<string:deck_id>/next", methods=["GET"])
 @jwt_required()
