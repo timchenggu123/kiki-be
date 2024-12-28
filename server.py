@@ -124,9 +124,9 @@ def batch_remove_note():
     col.remove_notes(note_ids)
     return jsonify({"message": "Notes removed successfully!"})
 
-@app.route("/cards/<string:card_id>", methods=["GET"])
+@app.route("/cards/<string:card_id>/note", methods=["GET"])
 @jwt_required()
-def get_card(card_id):
+def get_card_note(card_id):
     """Get a card by ID."""
     user = get_jwt_identity()
     collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
@@ -134,8 +134,9 @@ def get_card(card_id):
     card = col.get_card(int(card_id)).note()
     fields = card.fields
     keys = card.keys()
-    ret = [[key, field] for key, field in zip(keys, fields)]
-    return jsonify(ret)
+    note_data = [[key, field] for key, field in zip(keys, fields)]
+    note_id = card.id
+    return jsonify({"id": note_id, "note_data": note_data})
 
 @app.route("/notes/<string:note_id>", methods=["GET"])
 @jwt_required()
