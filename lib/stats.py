@@ -1,9 +1,10 @@
 from anki.collection import Collection
 
-def deck_card_stats(col: Collection, decks: list) -> str:# graph data
+def deck_card_stats(col: Collection, did: int) -> str:# graph data
+        col.decks.select(did)
         stats=col.stats()
         maturity_raw = stats._cards() #Four fields: mature, young, unseen, and suspended. Suspended is not used right nowl.
-        limit = f"({', '.join(str(d) for d in decks)})"
+        limit = stats._limit()
         # text data
         (c, f) = stats.col.db.first(
             """

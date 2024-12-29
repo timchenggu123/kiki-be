@@ -474,8 +474,8 @@ def get_deck_stats(deck_id):
     user = get_jwt_identity()
     collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
     col = Collection(collection_path)
-    decks = [deck_id]
-    stats = deck_card_stats(col, decks)
+    did = int(deck_id)
+    stats = deck_card_stats(col, did)
     return jsonify(stats)
 
 if __name__ == "__main__":
