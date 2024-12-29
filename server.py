@@ -11,8 +11,9 @@ import urllib.request
 from anki.collection import *
 from anki.scheduler.v3 import * 
 import auth_db
-from lib.media import *
-from lib.dictCard import *
+from lib.media import replacePlayTag, isTTSTag
+from lib.dictCard import createDictCardModel
+from lib.stats import deck_card_stats
 from pathlib import Path
 
 app = Flask(__name__)
@@ -466,6 +467,16 @@ def get_media(filename):
     base_dir = os.path.join(COLLECTION_ROOT, f"{user}.media")
     file_path = os.path.join(base_dir, filename)
     return send_file(file_path)
+
+@app.route("/deck/<string:deck_id>/stats", methods=["GET"])
+@jwt_required()
+def get_deck_stats(deck_id):
+    user = get_jwt_identity()
+    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+    col = Collection(collection_path)
+    decks = [deck_id]
+    stats = deck_card_stats(col, decks)
+    return jsonify(stats)
 
 if __name__ == "__main__":
     # app.run(debug=True)
