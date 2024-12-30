@@ -33,7 +33,7 @@ bcrypt = Bcrypt(app)
 jwt = JWTManager(app)
 CORS(app, supports_credentials=True)
 
-# Path to your Anki collection file
+# Path to Anki collection files
 COLLECTION_ROOT = "./storage/"
 
 @jwt.unauthorized_loader
@@ -93,70 +93,106 @@ def home():
 @jwt_required()
 def get_decks():
     """List all decks."""
-    user= get_jwt_identity()
-    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-    col = Collection(collection_path)
-    decks = col.decks.all_names_and_ids()
-    decks_list = [{"id": deck.id, "name": deck.name} for deck in decks]
-    return jsonify(decks_list)
+    col = None
+    try:
+        user= get_jwt_identity()
+        collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+        col = Collection(collection_path)
+        decks = col.decks.all_names_and_ids()
+        decks_list = [{"id": deck.id, "name": deck.name} for deck in decks]
+        return jsonify(decks_list)
+    except Exception as e:
+        if col:
+            col.close()
+        app.log_exception(e)
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/deck/<string:deck_id>/notes", methods=["GET"])
 @jwt_required()
 def get_notes(deck_id):
     """Get all cards from a deck."""
-    user = get_jwt_identity()
-    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-    col = Collection(collection_path)
-    note_ids = col.find_notes(f"did:{deck_id}")
-    notes = [{"id":id, "title": col.get_note(id).fields[0], "ncards": len(col.get_note(id).cards())} for id in note_ids]
-    return jsonify(notes)
+    col = None
+    try:
+        user = get_jwt_identity()
+        collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+        col = Collection(collection_path)
+        note_ids = col.find_notes(f"did:{deck_id}")
+        notes = [{"id":id, "title": col.get_note(id).fields[0], "ncards": len(col.get_note(id).cards())} for id in note_ids]
+        return jsonify(notes)
+    except Exception as e:
+        if col:
+            col.close()
+        app.log_exception(e)
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/note/batchremove", methods=["POST"])
 @jwt_required()
 def batch_remove_note():
     """Remove multiple ntoes."""
-    user = get_jwt_identity()
-    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-    col = Collection(collection_path)
-    data = request.json
-    note_ids = data.get("nids")
-    if len(note_ids) == 0:
-        return jsonify({"error": "No note IDs provided."}), 400
-    col.remove_notes(note_ids)
-    return jsonify({"message": "Notes removed successfully!"})
+    col = None
+    try:
+        user = get_jwt_identity()
+        collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+        col = Collection(collection_path)
+        data = request.json
+        note_ids = data.get("nids")
+        if len(note_ids) == 0:
+            return jsonify({"error": "No note IDs provided."}), 400
+        col.remove_notes(note_ids)
+        return jsonify({"message": "Notes removed successfully!"})
+    except Exception as e:
+        if col:
+            col.close()
+        app.log_exception(e)
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/cards/<string:card_id>/note", methods=["GET"])
 @jwt_required()
 def get_card_note(card_id):
     """Get a card by ID."""
-    user = get_jwt_identity()
-    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-    col = Collection(collection_path)
-    card = col.get_card(int(card_id)).note()
-    fields = card.fields
-    keys = card.keys()
-    note_data = [[key, field] for key, field in zip(keys, fields)]
-    note_id = card.id
-    return jsonify({"id": note_id, "note_data": note_data})
+    col = None
+    try:
+        user = get_jwt_identity()
+        collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+        col = Collection(collection_path)
+        card = col.get_card(int(card_id)).note()
+        fields = card.fields
+        keys = card.keys()
+        note_data = [[key, field] for key, field in zip(keys, fields)]
+        note_id = card.id
+        return jsonify({"id": note_id, "note_data": note_data})
+    except Exception as e:
+        if col:
+            col.close()
+        app.log_exception(e)
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/notes/<string:note_id>", methods=["GET"])
 @jwt_required()
 def get_note(note_id):
     """Get a card by ID."""
-    user = get_jwt_identity()
-    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-    col = Collection(collection_path)
-    note = col.get_note(int(note_id))
-    fields = note.fields
-    keys = note.keys()
-    ret = [[key, field] for key, field in zip(keys, fields)]
-    return jsonify(ret)
+    col = None
+    try:
+        user = get_jwt_identity()
+        collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+        col = Collection(collection_path)
+        note = col.get_note(int(note_id))
+        fields = note.fields
+        keys = note.keys()
+        ret = [[key, field] for key, field in zip(keys, fields)]
+        return jsonify(ret)
+    except Exception as e:
+        if col:
+            col.close()
+        app.log_exception(e)
+        return jsonify({"error": str(e)}), 500
 
 #Edit a note
 @app.route("/note/update/<string:note_id>", methods=["POST"])
 @jwt_required()
 def update_note(note_id):
     """Edit a note."""
+    col = None
     try: 
         user = get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
@@ -169,12 +205,16 @@ def update_note(note_id):
         col.update_note(note)
         return jsonify({"message": "Note updated successfully!"})
     except Exception as e:
+        if col:
+            col.close()
+        app.log_exception(e)
         return jsonify({"error": str(e)}), 500
 
 @app.route("/deck/<string:deck_id>/add/raw", methods=["POST"])
 @jwt_required()
 def add_card_raw(deck_id):
     """Add a new card to a deck."""
+    col = None
     try:
         user = get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
@@ -193,6 +233,9 @@ def add_card_raw(deck_id):
         col.add_note(note, int(deck_id))
         return jsonify({"message": "Card added successfully!"})
     except Exception as e:
+        if col:
+            col.close()
+        app.log_exception(e)
         return jsonify({"error": str(e)}), 500
     
 
@@ -200,39 +243,44 @@ def add_card_raw(deck_id):
 @jwt_required()
 def add_card_dict(deck_id):
     """Add a new card to a deck."""
-    # try:
-    user = get_jwt_identity()
-    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-    col = Collection(collection_path)
-    data = request.json
-    word = data.get("word")
-    phonetic = data.get("phonetic")
-    meanings = data.get("meanings_text")
-    origin = data.get("origin")
-    audio = data.get("audio")
+    col = None
+    try:
+        user = get_jwt_identity()
+        collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+        col = Collection(collection_path)
+        data = request.json
+        word = data.get("word")
+        phonetic = data.get("phonetic")
+        meanings = data.get("meanings_text")
+        origin = data.get("origin")
+        audio = data.get("audio")
 
-    # Get dict card model
-    if col.models.by_name("KikiDictCard"):
-        col.models.remove(col.models.by_name("KikiDictCard")["id"])
-    createDictCardModel(col)
-    model = col.models.by_name("KikiDictCard")
-    note = col.new_note(model)
-    print(note.fields)
-    note.fields[0] = word
-    note.fields[1] = phonetic
-    note.fields[2] = audio
-    note.fields[3] = meanings
-    note.fields[4] = origin
+        # Get dict card model
+        if col.models.by_name("KikiDictCard"):
+            col.models.remove(col.models.by_name("KikiDictCard")["id"])
+        createDictCardModel(col)
+        model = col.models.by_name("KikiDictCard")
+        note = col.new_note(model)
+        print(note.fields)
+        note.fields[0] = word
+        note.fields[1] = phonetic
+        note.fields[2] = audio
+        note.fields[3] = meanings
+        note.fields[4] = origin
 
-    col.add_note(note, int(deck_id))
-    return jsonify({"message": "Card added successfully!"})
-    # except Exception as e:
-    #     return jsonify({"error": str(e)}), 500
+        col.add_note(note, int(deck_id))
+        return jsonify({"message": "Card added successfully!"})
+    except Exception as e:
+        if col:
+            col.close()
+        app.log_exception(e)
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/deck/<string:deck_id>/add/from/<string:card_id>", methods=["GET"])
 @jwt_required()
 def add_card_from(deck_id, card_id):
     """Add a new card to a deck."""
+    col = None
     try:
         # First, duplicate the note
         user = get_jwt_identity()
@@ -246,6 +294,9 @@ def add_card_from(deck_id, card_id):
         col.add_note(new_note, int(deck_id))
         return jsonify({"message": "Card added successfully!"})
     except Exception as e:
+        if col:
+            col.close()
+        app.log_exception(e)
         return jsonify({"error": str(e)}), 500
     
 
@@ -253,15 +304,22 @@ def add_card_from(deck_id, card_id):
 @jwt_required()
 def remove_card(cid):
     """Add a new card to a deck."""
-    user = get_jwt_identity()
-    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-    col = Collection(collection_path)
-    data = request.json
-    cid = int(data.get("cid"))
-    card_id = int(cid)
-    note_id = col.get_card(card_id).nid
-    col.remove_notes([note_id])
-    return jsonify({"message": "Card removed successfully!"})
+    col = None
+    try:
+        user = get_jwt_identity()
+        collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+        col = Collection(collection_path)
+        data = request.json
+        cid = int(data.get("cid"))
+        card_id = int(cid)
+        note_id = col.get_card(card_id).nid
+        col.remove_notes([note_id])
+        return jsonify({"message": "Card removed successfully!"})
+    except Exception as e:
+        if col:
+            col.close()
+        app.log_exception(e)
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/study/<string:deck_id>/next", methods=["GET"])
 @jwt_required()
@@ -269,6 +327,7 @@ def get_next_card(deck_id):
     """
     Get the next card to study from the scheduler.
     """
+    col = None
     try:
         # Set the deck for the session
         user = get_jwt_identity()
@@ -338,6 +397,9 @@ def get_next_card(deck_id):
         })
 
     except Exception as e:
+        if col:
+            col.close()
+        app.log_exception(e)
         return jsonify({"error": str(e)}), 500
 
 
@@ -347,6 +409,7 @@ def answer_card():
     """
     Submit an answer for a card using the scheduler.
     """
+    col = None
     try:
         user = get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
@@ -374,109 +437,152 @@ def answer_card():
         return jsonify({"message": "Card answered successfully.", "Card ID": card_id, "Ease": rating})
         
     except Exception as e:
+        if col:
+            col.close()
+        app.log_exception(e)
         return jsonify({"error": str(e)}), 500
     
-# @app.route("/download_deck", methods=["POST"])
-# @jwt_required()
-# def dowload_deck():
-#     """Add a new deck."""
-#     data = request.json
-#     url = data.get("url")
-#     urllib.request.urlretrieve(url, "tmp.apkg")
-#     import_request = ImportAnkiPackageRequest(package_path="tmp.apkg")
-#     col.import_anki_package(import_request)
-#     os.remove("tmp.apkg")
-#     return jsonify({"message": "Deck added successfully!"})
-
 @app.route("/deck/add", methods=["POST"])
 @jwt_required()
 def add_deck():
     """Add a new deck."""
-    user = get_jwt_identity()
-    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-    col = Collection(collection_path)
-    data = request.json
-    name = data.get("name")
-    col.decks.add_normal_deck_with_name(name)
-    return jsonify({"message": "Deck added successfully!"})
+    col = None
+    try:
+        user = get_jwt_identity()
+        collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+        col = Collection(collection_path)
+        data = request.json
+        name = data.get("name")
+        col.decks.add_normal_deck_with_name(name)
+        return jsonify({"message": "Deck added successfully!"})
+    except Exception as e:
+        if col:
+            col.close()
+        app.log_exception(e)
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/deck/remove/<string:deck_id>", methods=["GET"])
 @jwt_required()
 def remove_deck(deck_id):
     """Remove a deck."""
-    user = get_jwt_identity()
-    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-    col = Collection(collection_path)
-    did = int(deck_id)
-    col.decks.remove([did])
-    return jsonify({"message": "Deck removed successfully!"})
+    col=None
+    try:
+        user = get_jwt_identity()
+        collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+        col = Collection(collection_path)
+        did = int(deck_id)
+        col.decks.remove([did])
+        return jsonify({"message": "Deck removed successfully!"})
+    except Exception as e:
+        if col:
+            col.close()
+        app.log_exception(e)
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/deck/config/<string:deck_id>", methods=["GET"])
 @jwt_required()
 def get_deck_config(deck_id):
     """Get the configuration of a deck."""
-    user = get_jwt_identity()
-    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-    col = Collection(collection_path)
-    did = int(deck_id)
-    config = col.decks.config_dict_for_deck_id(did)
-    return jsonify(config)
+    col=None
+    try:
+        user = get_jwt_identity()
+        collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+        col = Collection(collection_path)
+        did = int(deck_id)
+        config = col.decks.config_dict_for_deck_id(did)
+        return jsonify(config)
+    except Exception as e:
+        if col:
+            col.close()
+        app.log_exception(e)
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/deck/config/<string:deck_id>", methods=["POST"])
 @jwt_required()
 def set_deck_config(deck_id):
     """Set the configuration of a deck."""
-    user = get_jwt_identity()
-    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-    col = Collection(collection_path)
-    data = request.json
-    col.decks.update_config(data)
-    col.sched.resort_conf(data)
-    return jsonify({"message": "Deck configuration updated successfully!"})
+    col=None
+    try:
+        user = get_jwt_identity()
+        collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+        col = Collection(collection_path)
+        data = request.json
+        col.decks.update_config(data)
+        col.sched.resort_conf(data)
+        return jsonify({"message": "Deck configuration updated successfully!"})
+    except Exception as e:
+        if col:
+            col.close()
+        app.log_exception(e)
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/upload/deck', methods=['POST'])
 @jwt_required()
 def upload_file():
-    user = get_jwt_identity()
-    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-    col = Collection(collection_path)
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file part in the request'}), 400
-    
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
+    """Upload an Anki deck file."""
+    col = None
+    try:
+        user = get_jwt_identity()
+        collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+        col = Collection(collection_path)
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file part in the request'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No selected file'}), 400
 
-    tmp_dir = f"./tmp/{user}"
-    Path(tmp_dir).mkdir(parents=True, exist_ok=True)
-    filepath = os.path.join(tmp_dir, file.filename)
-    file.save(filepath)
+        tmp_dir = f"./tmp/{user}"
+        Path(tmp_dir).mkdir(parents=True, exist_ok=True)
+        filepath = os.path.join(tmp_dir, file.filename)
+        file.save(filepath)
 
-    #import the deck
-    import_request = ImportAnkiPackageRequest(package_path=filepath)
-    col.import_anki_package(import_request)
-    # Remove the file
-    os.remove(filepath)
+        #import the deck
+        import_request = ImportAnkiPackageRequest(package_path=filepath)
+        col.import_anki_package(import_request)
+        # Remove the file
+        os.remove(filepath)
 
-    return jsonify({'message': 'File uploaded successfully', 'filename': file.filename}), 200
+        return jsonify({'message': 'File uploaded successfully', 'filename': file.filename}), 200
+    except Exception as e:
+        if col:
+            col.close()
+        app.log_exception(e)
+        return jsonify({'error': str(e)}), 500
 
 @app.route("/media/<string:filename>", methods=["GET"])
 @jwt_required()
 def get_media(filename):
-    user = get_jwt_identity()
-    base_dir = os.path.join(COLLECTION_ROOT, f"{user}.media")
-    file_path = os.path.join(base_dir, filename)
-    return send_file(file_path)
+    """Get a media file."""
+    col = None
+    try:
+        user = get_jwt_identity()
+        base_dir = os.path.join(COLLECTION_ROOT, f"{user}.media")
+        file_path = os.path.join(base_dir, filename)
+        return send_file(file_path)
+    except Exception as e:
+        if col:
+            col.close()
+        app.log_exception(e)
+        return jsonify({'error': str(e)}), 500
 
 @app.route("/deck/<string:deck_id>/stats", methods=["GET"])
 @jwt_required()
 def get_deck_stats(deck_id):
-    user = get_jwt_identity()
-    collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-    col = Collection(collection_path)
-    did = int(deck_id)
-    stats = deck_card_stats(col, did)
-    return jsonify(stats)
+    """Get statistics for a deck."""
+    col = None
+    try:
+        user = get_jwt_identity()
+        collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+        col = Collection(collection_path)
+        did = int(deck_id)
+        stats = deck_card_stats(col, did)
+        return jsonify(stats)
+    except Exception as e:
+        if col:
+            col.close()
+        app.log_exception(e)
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == "__main__":
     # app.run(debug=True)
