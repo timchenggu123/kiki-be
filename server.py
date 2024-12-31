@@ -321,6 +321,25 @@ def remove_card(cid):
         app.log_exception(e)
         return jsonify({"error": str(e)}), 500
 
+@app.route("/card/suspend", methods=["POST"])
+@jwt_required()
+def suspend_card():
+    """Bury a card."""
+    col = None
+    try:
+        user = get_jwt_identity()
+        collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+        col = Collection(collection_path)
+        data = request.json
+        card_id = int(data.get("cid"))
+        col.sched.suspend_cards([card_id])
+        return jsonify({"message": "Card buried successfully!"})
+    except Exception as e:
+        if col:
+            col.close()
+        app.log_exception(e)
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/study/<string:deck_id>/next", methods=["GET"])
 @jwt_required()
 def get_next_card(deck_id):

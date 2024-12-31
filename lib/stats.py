@@ -20,6 +20,7 @@ where did in %s """
             "mature": maturity_raw[0],
             "young": maturity_raw[1],
             "unseen": maturity_raw[2],
+            "suspended": maturity_raw[3],
             "count": c,
             "unique": f,
             "low_ease": low_ease,
