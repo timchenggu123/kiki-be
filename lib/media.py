@@ -11,7 +11,9 @@ def replacePlayTag(txt, front_av_files:list, back_av_tags:list):
             files = back_av_tags
         file = files[int(match.group(3))]
         return f'''
+<center>
 <audio src="{file}" controls></audio>
+</center>
 '''
     return expr.sub(repl, txt)
 
