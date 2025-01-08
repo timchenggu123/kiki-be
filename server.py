@@ -1,4 +1,5 @@
 import os, sys
+
 os.chdir(os.path.dirname(__file__))
 sys.path.append(os.path.dirname(__file__))
 from flask import Flask, jsonify, request, send_file, redirect
@@ -356,13 +357,14 @@ def get_next_card(deck_id):
         col.decks.select(deck_id)  # Select the specified deck
 
         # Get the next card from the scheduler
+        new, learning, review = col.sched.counts()
+        if (new + learning + review) == 0:
+            return jsonify({"message": "No cards to study."}), 404
         queued_card = col.sched.get_queued_cards().cards[0]
         card_id = queued_card.card.id
         card = col.get_card(card_id)
 
         print(card.timer_started)
-        if not card:
-            return jsonify({"message": "No cards available for study."}), 404
 
         front = card.question()
         back = card.answer()
@@ -402,7 +404,6 @@ def get_next_card(deck_id):
             "Back": back,  # Back field
         }
 
-        new, learning, review = col.sched.counts()
         counts = {
             "new": new,
             "learning": learning,
@@ -526,7 +527,21 @@ def set_deck_config(deck_id):
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
         col = Collection(collection_path)
         data = request.json
+
+        #=================Update Config=====================
+        #Update the deck config
         col.decks.update_config(data)
+
+        #Update the ignore review limit setting, which is only available though the pb2 API. 
+        did = int(deck_id)
+        config = col.decks.get_deck_configs_for_update(did).all_config[0].config
+        conf_req = anki.deck_config_pb2.UpdateDeckConfigsRequest()
+        conf_req.configs.append(config)
+        conf_req.new_cards_ignore_review_limit = True #This is all these five lines are for, to ignore review limit
+        col.decks.update_deck_configs(conf_req)
+
+        # #=================Update Config=====================
+
         col.sched.resort_conf(data)
         return jsonify({"message": "Deck configuration updated successfully!"})
     except Exception as e:
