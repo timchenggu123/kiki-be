@@ -109,9 +109,9 @@ def get_decks():
         app.log_exception(e)
         return jsonify({"error": str(e)}), 500
 
-@app.route("/deck/<string:deck_id>/notes/<string:offset>", methods=["GET"])
+@app.route("/deck/<string:deck_id>/notes/<string:query>/<string:offset>", methods=["GET"])
 @jwt_required()
-def get_notes(deck_id, offset=0):
+def get_notes(deck_id, query, offset=0):
     """Get all notes from a deck. Offset is the starting index of the notes."""
     col = None
     try:
@@ -120,7 +120,8 @@ def get_notes(deck_id, offset=0):
         user = get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
         col = tryOpenCollection(collection_path)
-        note_ids = col.find_notes(f"did:{deck_id}")
+        query = query if query else "all"
+        note_ids = col.find_notes(f"{query} did:{deck_id}")
         n_notes = len(note_ids)
         if offset >= n_notes:
             return jsonify({"total": n_notes, "notes": []})
@@ -151,7 +152,6 @@ def search_notes(deck_id, query):
     col = None
     try:
         limit = 100
-        offset = int(offset)
         user = get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
         col = tryOpenCollection(collection_path)
