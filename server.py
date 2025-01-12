@@ -15,6 +15,7 @@ import auth_db
 from lib.media import replacePlayTag, isTTSTag
 from lib.dictCard import createDictCardModel
 from lib.stats import deck_card_stats
+from lib.collection import tryOpenCollection
 from pathlib import Path
 
 app = Flask(__name__)
@@ -98,7 +99,7 @@ def get_decks():
     try:
         user= get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-        col = Collection(collection_path)
+        col = tryOpenCollection(collection_path)
         decks = col.decks.all_names_and_ids()
         decks_list = [{"id": deck.id, "name": deck.name} for deck in decks]
         return jsonify(decks_list)
@@ -108,23 +109,65 @@ def get_decks():
         app.log_exception(e)
         return jsonify({"error": str(e)}), 500
 
-@app.route("/deck/<string:deck_id>/notes", methods=["GET"])
+@app.route("/deck/<string:deck_id>/notes/<string:offset>", methods=["GET"])
 @jwt_required()
-def get_notes(deck_id):
-    """Get all notes from a deck."""
+def get_notes(deck_id, offset=0):
+    """Get all notes from a deck. Offset is the starting index of the notes."""
     col = None
     try:
+        limit = 100
+        offset = int(offset)
         user = get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-        col = Collection(collection_path)
+        col = tryOpenCollection(collection_path)
         note_ids = col.find_notes(f"did:{deck_id}")
-        def get_title(node_id):
-            title = col.get_note(id).joined_fields()
+        n_notes = len(note_ids)
+        if offset >= n_notes:
+            return jsonify({"total": n_notes, "notes": []})
+        if offset + limit > n_notes:
+            limit = n_notes - offset
+        note_ids = note_ids[offset:offset+limit]
+        def get_title(note_id):
+            title = col.get_note(note_id).joined_fields()
             if len (title) > 30:
                 title = title[:30] + "..."
             return title
         notes = [{"id":id, "title": get_title(id), "ncards": len(col.get_note(id).cards())} for id in note_ids]
-        return jsonify(notes)
+        ret = {
+            "total": n_notes,
+            "notes": notes
+        }
+        return jsonify(ret)
+    except Exception as e:
+        if col:
+            col.close()
+        app.log_exception(e)
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/deck/<string:deck_id>/search/<string:query>", methods=["GET"])
+@jwt_required()
+def search_notes(deck_id, query):
+    """Get all notes from a deck. Offset is the starting index of the notes."""
+    col = None
+    try:
+        limit = 100
+        offset = int(offset)
+        user = get_jwt_identity()
+        collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+        col = tryOpenCollection(collection_path)
+        note_ids = col.find_notes(f"{query} did:{deck_id}")
+        n_notes = len(note_ids)
+        def get_title(note_id):
+            title = col.get_note(note_id).joined_fields()
+            if len (title) > 30:
+                title = title[:30] + "..."
+            return title
+        notes = [{"id":id, "title": get_title(id), "ncards": len(col.get_note(id).cards())} for id in note_ids]
+        ret = {
+            "total": n_notes,
+            "notes": notes
+        }
+        return jsonify(ret)
     except Exception as e:
         if col:
             col.close()
@@ -139,7 +182,7 @@ def batch_remove_note():
     try:
         user = get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-        col = Collection(collection_path)
+        col = tryOpenCollection(collection_path)
         data = request.json
         note_ids = data.get("nids")
         if len(note_ids) == 0:
@@ -160,7 +203,7 @@ def get_card_note(card_id):
     try:
         user = get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-        col = Collection(collection_path)
+        col = tryOpenCollection(collection_path)
         card = col.get_card(int(card_id)).note()
         fields = card.fields
         keys = card.keys()
@@ -181,7 +224,7 @@ def get_note(note_id):
     try:
         user = get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-        col = Collection(collection_path)
+        col = tryOpenCollection(collection_path)
         note = col.get_note(int(note_id))
         fields = note.fields
         keys = note.keys()
@@ -202,7 +245,7 @@ def update_note(note_id):
     try: 
         user = get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-        col = Collection(collection_path)
+        col = tryOpenCollection(collection_path)
         fields = request.json
         note = col.get_note(int(note_id))
         assert len(fields) == len(note.fields)
@@ -224,7 +267,7 @@ def add_card_raw(deck_id):
     try:
         user = get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-        col = Collection(collection_path)
+        col = tryOpenCollection(collection_path)
         data = request.json
         front = data.get("front")
         back = data.get("back")
@@ -253,7 +296,7 @@ def add_card_dict(deck_id):
     try:
         user = get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-        col = Collection(collection_path)
+        col = tryOpenCollection(collection_path)
         data = request.json
         word = data.get("word")
         phonetic = data.get("phonetic")
@@ -291,7 +334,7 @@ def add_card_from(deck_id, card_id):
         # First, duplicate the note
         user = get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-        col = Collection(collection_path)
+        col = tryOpenCollection(collection_path)
         note = col.get_card(int(card_id)).note()
         new_note = col.new_note(note.note_type())
         new_note.fields = note.fields
@@ -314,7 +357,7 @@ def remove_card(cid):
     try:
         user = get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-        col = Collection(collection_path)
+        col = tryOpenCollection(collection_path)
         data = request.json
         cid = int(data.get("cid"))
         card_id = int(cid)
@@ -335,7 +378,7 @@ def suspend_card():
     try:
         user = get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-        col = Collection(collection_path)
+        col = tryOpenCollection(collection_path)
         data = request.json
         card_id = int(data.get("cid"))
         col.sched.suspend_cards([card_id])
@@ -357,7 +400,7 @@ def get_next_card(deck_id):
         # Set the deck for the session
         user = get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-        col = Collection(collection_path)
+        col = tryOpenCollection(collection_path)
         deck_id = int(deck_id)
         col.decks.select(deck_id)  # Select the specified deck
 
@@ -438,7 +481,7 @@ def answer_card():
     try:
         user = get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-        col = Collection(collection_path)
+        col = tryOpenCollection(collection_path)
         data = request.json
         rating = data.get("rating")  # User's ease rating: 1 = Again, 2 = Hard, 3 = Good, 4 = Easy
         card_id = int(data.get("cid"))  # ID of the card being answered
@@ -475,7 +518,7 @@ def add_deck():
     try:
         user = get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-        col = Collection(collection_path)
+        col = tryOpenCollection(collection_path)
         data = request.json
         name = data.get("name")
         col.decks.add_normal_deck_with_name(name)
@@ -494,7 +537,7 @@ def remove_deck(deck_id):
     try:
         user = get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-        col = Collection(collection_path)
+        col = tryOpenCollection(collection_path)
         did = int(deck_id)
         col.decks.remove([did])
         return jsonify({"message": "Deck removed successfully!"})
@@ -512,7 +555,7 @@ def get_deck_config(deck_id):
     try:
         user = get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-        col = Collection(collection_path)
+        col = tryOpenCollection(collection_path)
         did = int(deck_id)
         config = col.decks.config_dict_for_deck_id(did)
         return jsonify(config)
@@ -530,7 +573,7 @@ def set_deck_config(deck_id):
     try:
         user = get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-        col = Collection(collection_path)
+        col = tryOpenCollection(collection_path)
         data = request.json
 
         #=================Update Config=====================
@@ -563,7 +606,7 @@ def upload_file():
     try:
         user = get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-        col = Collection(collection_path)
+        col = tryOpenCollection(collection_path)
         if 'file' not in request.files:
             return jsonify({'error': 'No file part in the request'}), 400
         
@@ -613,7 +656,7 @@ def get_deck_stats(deck_id):
     try:
         user = get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
-        col = Collection(collection_path)
+        col = tryOpenCollection(collection_path)
         did = int(deck_id) if int(deck_id) > 0 else col.decks.current()["id"] #use default deck if deck_id is not provided
         stats = deck_card_stats(col, did)
         return jsonify(stats)
