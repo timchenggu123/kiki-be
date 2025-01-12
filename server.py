@@ -16,6 +16,7 @@ from lib.media import replacePlayTag, isTTSTag
 from lib.dictCard import createDictCardModel
 from lib.stats import deck_card_stats
 from lib.collection import tryOpenCollection
+from lib.logs import getTodayStudiedCards
 from pathlib import Path
 
 app = Flask(__name__)
@@ -666,6 +667,29 @@ def get_deck_stats(deck_id):
         app.log_exception(e)
         return jsonify({'error': str(e)}), 500
 
+@app.route("/logs/today", methods=["GET"])
+@jwt_required()
+def get_today_logs():
+    """Get statistics for a deck."""
+    col = None
+    try:
+        user = get_jwt_identity()
+        collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+        col = tryOpenCollection(collection_path)
+        log = getTodayStudiedCards(col)
+        def data_preview(data):
+            if len(data) > 30:
+                return data[:30] + "..."
+            return data
+        ret = [{"log_type": l[0],  "nid": l[1], "ord": l[2], "data": data_preview(l[3])} for l in log]
+        return jsonify(ret)
+    except Exception as e:
+        if col:
+            col.close()
+        app.log_exception(e)
+        return jsonify({'error': str(e)}), 500
+    
 if __name__ == "__main__":
     # app.run(debug=True)
     app.run(host="0.0.0.0", port=5000)
+
