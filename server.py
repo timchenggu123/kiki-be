@@ -111,14 +111,19 @@ def get_decks():
 @app.route("/deck/<string:deck_id>/notes", methods=["GET"])
 @jwt_required()
 def get_notes(deck_id):
-    """Get all cards from a deck."""
+    """Get all notes from a deck."""
     col = None
     try:
         user = get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
         col = Collection(collection_path)
         note_ids = col.find_notes(f"did:{deck_id}")
-        notes = [{"id":id, "title": col.get_note(id).fields[0], "ncards": len(col.get_note(id).cards())} for id in note_ids]
+        def get_title(node_id):
+            title = col.get_note(id).joined_fields()
+            if len (title) > 30:
+                title = title[:30] + "..."
+            return title
+        notes = [{"id":id, "title": get_title(id), "ncards": len(col.get_note(id).cards())} for id in note_ids]
         return jsonify(notes)
     except Exception as e:
         if col:
@@ -609,7 +614,7 @@ def get_deck_stats(deck_id):
         user = get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
         col = Collection(collection_path)
-        did = int(deck_id)
+        did = int(deck_id) if int(deck_id) > 0 else col.decks.current()["id"] #use default deck if deck_id is not provided
         stats = deck_card_stats(col, did)
         return jsonify(stats)
     except Exception as e:
