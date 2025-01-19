@@ -122,7 +122,7 @@ def get_notes(deck_id, query, offset=0):
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
         col = tryOpenCollection(collection_path)
         query = query if query != "all" else ""
-        card_ids = col.find_cards(f"{query} did:{deck_id}")
+        card_ids = col.find_cards(f"{query} did:{deck_id}", order="c.id asc")
         n_cards = len(card_ids)
         if offset >= n_cards:
             return jsonify({"total": n_cards, "notes": []})
@@ -376,9 +376,9 @@ def remove_card(cid):
         app.log_exception(e)
         return jsonify({"error": str(e)}), 500
 
-@app.route("/card/suspend", methods=["POST"])
+@app.route("/cards/suspend", methods=["POST"])
 @jwt_required()
-def suspend_card():
+def suspend_cards():
     """Bury a card."""
     col = None
     try:
@@ -386,9 +386,29 @@ def suspend_card():
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
         col = tryOpenCollection(collection_path)
         data = request.json
-        card_id = int(data.get("cid"))
-        col.sched.suspend_cards([card_id])
-        return jsonify({"message": "Card buried successfully!"})
+        card_ids = data.get("cids")
+        print(card_ids)
+        col.sched.suspend_cards(card_ids)
+        return jsonify({"message": "Cards suspended successfully!"})
+    except Exception as e:
+        if col:
+            col.close()
+        app.log_exception(e)
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/cards/unsuspend", methods=["POST"])
+@jwt_required()
+def unsuspend_cards():
+    """Bury a card."""
+    col = None
+    try:
+        user = get_jwt_identity()
+        collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
+        col = tryOpenCollection(collection_path)
+        data = request.json
+        card_ids = data.get("cids")
+        col.sched.unsuspend_cards(card_ids)
+        return jsonify({"message": "Cards suspended successfully!"})
     except Exception as e:
         if col:
             col.close()
