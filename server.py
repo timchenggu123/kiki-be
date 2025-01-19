@@ -110,7 +110,7 @@ def get_decks():
         app.log_exception(e)
         return jsonify({"error": str(e)}), 500
 
-@app.route("/deck/<string:deck_id>/notes/<string:query>/<string:offset>", methods=["GET"])
+@app.route("/deck/<string:deck_id>/cards/<string:query>/<string:offset>", methods=["GET"])
 @jwt_required()
 def get_notes(deck_id, query, offset=0):
     """Get all notes from a deck. Offset is the starting index of the notes."""
@@ -121,23 +121,28 @@ def get_notes(deck_id, query, offset=0):
         user = get_jwt_identity()
         collection_path = os.path.join(COLLECTION_ROOT, f"{user}.anki2")
         col = tryOpenCollection(collection_path)
-        query = query if query else "all"
-        note_ids = col.find_notes(f"{query} did:{deck_id}")
-        n_notes = len(note_ids)
-        if offset >= n_notes:
-            return jsonify({"total": n_notes, "notes": []})
-        if offset + limit > n_notes:
-            limit = n_notes - offset
-        note_ids = note_ids[offset:offset+limit]
-        def get_title(note_id):
-            title = col.get_note(note_id).joined_fields()
-            if len (title) > 30:
-                title = title[:30] + "..."
-            return title
-        notes = [{"id":id, "title": get_title(id), "ncards": len(col.get_note(id).cards())} for id in note_ids]
+        query = query if query != "all" else ""
+        card_ids = col.find_cards(f"{query} did:{deck_id}")
+        n_cards = len(card_ids)
+        if offset >= n_cards:
+            return jsonify({"total": n_cards, "notes": []})
+        if offset + limit > n_cards:
+            limit = n_cards - offset
+        card_ids = card_ids[offset:offset+limit]
+
+        TRUNCATE_LENGTH = 40
+        def get_card(cid):
+            card = col.get_card(cid)
+            title = card.note().joined_fields()
+            
+            if len (title) > TRUNCATE_LENGTH:
+                title = title[:TRUNCATE_LENGTH] + "..."
+            return {"nid": card.nid, "cid": cid, "title": title, "state": card.queue, "ord": card.ord}
+            
+        cards = [get_card(cid) for cid in card_ids]
         ret = {
-            "total": n_notes,
-            "notes": notes
+            "total": n_cards,
+            "cards": cards
         }
         return jsonify(ret)
     except Exception as e:
